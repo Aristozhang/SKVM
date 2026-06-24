@@ -11,7 +11,8 @@
 // the bundled opencode step, not the skvm binary — but this is the entry point for
 // both, so both env vars gate this script).
 //
-// Windows is intentionally not supported in this round (plan §1.3 targets darwin/linux only).
+// Windows is now supported — skips opencode bundling by default,
+// using the system-installed opencode on PATH instead.
 
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -42,6 +43,7 @@ const TARGETS = {
   "darwin-x64": "darwin-x64",
   "linux-x64": "linux-x64",
   "linux-arm64": "linux-arm64",
+  "win32-x64": "windows-x64",
 }
 
 const platform = process.platform
@@ -94,7 +96,9 @@ mkdirSync(tmpDir, { recursive: true })
 
 const tarballName = `skvm-v${version}-${target}.tar.gz`
 const tarballRel = `/${owner}/${repo}/releases/download/v${version}/${tarballName}`
+const isZip = tarballName.endsWith(".zip")
 const tmpTarball = path.join(tmpDir, tarballName)
+const isWin = process.platform === "win32"
 
 // Timeouts (important for CN ↔ GitHub): short connect so we fall back fast,
 // longer idle so slow but working mirrors still complete.
@@ -206,17 +210,28 @@ try {
     throw new Error(`sha256 mismatch: expected ${expectedSum}, got ${actualSum}`)
   }
 
-  // Extract using system tar. Bundled opencode (if present in the tarball under
-  // vendor/opencode/) is extracted too. For now we extract everything and let
-  // the tar lay out: bin/skvm, vendor/, skills/.
-  const res = spawnSync("tar", ["-xzf", tmpTarball, "-C", pkgRoot], { stdio: "inherit" })
-  if (res.status !== 0) throw new Error(`tar extraction failed (exit ${res.status})`)
+  // Extract the archive. On Windows, if tar is not available, fall back to
+  // expanding .zip via PowerShell (Expand-Archive is built-in since Win10).
+  let extractRes
+  if (isZip) {
+    extractRes = spawnSync("powershell", [
+      "-NoProfile", "-Command",
+      `Expand-Archive -Path "${tmpTarball}" -DestinationPath "${pkgRoot}" -Force`,
+    ], { stdio: "inherit" })
+    if (extractRes.status !== 0) {
+      // Fallback: try tar (some Windows systems have it)
+      extractRes = spawnSync("tar", ["-xzf", tmpTarball, "-C", pkgRoot], { stdio: "inherit" })
+    }
+  } else {
+    extractRes = spawnSync("tar", ["-xzf", tmpTarball, "-C", pkgRoot], { stdio: "inherit" })
+  }
+  if (extractRes.status !== 0) throw new Error(`extraction failed (exit ${extractRes.status})`)
 
-  const binaryPath = path.join(binDir, "skvm")
+  const binaryPath = path.join(binDir, isWin ? "skvm.exe" : "skvm")
   if (!existsSync(binaryPath)) {
     throw new Error(`binary not found at ${binaryPath} after extraction`)
   }
-  chmodSync(binaryPath, 0o755)
+  if (!isWin) chmodSync(binaryPath, 0o755)
 
   console.log(`skvm postinstall: installed skvm v${version} for ${target}`)
 } catch (err) {
@@ -232,7 +247,10 @@ try {
 
 // -------- opencode bundling (plan §1.8) --------
 // Keep this in sync with install/install.sh — same version, same URL pattern.
-if (process.env.SKVM_SKIP_OPENCODE !== "1") {
+// On Windows, skip by default — users should install opencode globally and
+// rely on the system-PATH resolution in src/adapters/opencode.ts.
+const skipOpencode = isWin || process.env.SKVM_SKIP_OPENCODE === "1"
+if (!skipOpencode) {
   try {
     await installOpencode()
   } catch (err) {
@@ -293,13 +311,19 @@ async function installOpencode() {
       throw new Error(`unknown opencode archive format: ${ocFormat}`)
     }
     if (extractRes.status !== 0) {
+      // Fallback for zip on Windows without unzip: try tar (supports zip too)
+      if (isWin && ocFormat === "zip") {
+        extractRes = spawnSync("tar", ["-xf", ocTmp, "-C", stage], { stdio: "inherit" })
+      }
+    }
+    if (extractRes.status !== 0) {
       throw new Error(`opencode extraction failed (exit ${extractRes.status})`)
     }
 
     // Locate the extracted `opencode` binary: prefer <stage>/opencode, else
-    // search recursively (handles both the current flat-single-binary layout
-    // and any future wrapped layout).
-    const candidate = path.join(stage, "opencode")
+    // search recursively. On Windows the binary is `opencode.exe`.
+    const ocBinaryName = isWin ? "opencode.exe" : "opencode"
+    const candidate = path.join(stage, ocBinaryName)
     let found = existsSync(candidate) ? candidate : null
     if (!found) {
       const walk = (dir) => {
@@ -308,7 +332,7 @@ async function installOpencode() {
           if (entry.isDirectory()) {
             const hit = walk(p)
             if (hit) return hit
-          } else if (entry.isFile() && entry.name === "opencode") {
+          } else if (entry.isFile() && (entry.name === "opencode" || entry.name === "opencode.exe")) {
             return p
           }
         }
@@ -322,14 +346,17 @@ async function installOpencode() {
 
     mkdirSync(path.join(versionDir, "bin"), { recursive: true })
     renameSync(found, binPath)
-    chmodSync(binPath, 0o755)
+    if (!isWin) chmodSync(binPath, 0o755)
     rmSync(stage, { recursive: true, force: true })
   }
 
-  // Update the "current" symlink used by src/adapters/opencode.ts resolver
+  // Update the "current" symlink used by src/adapters/opencode.ts resolver.
+  // On Windows, use a junction or just skip (opencode bundling is optional).
   const currentLink = path.join(vendorRoot, "current")
   try { if (lstatSync(currentLink)) unlinkSync(currentLink) } catch {}
-  symlinkSync(ocTag, currentLink, "dir")
+  if (!isWin) {
+    symlinkSync(ocTag, currentLink, "dir")
+  }
 
   // Create isolated profile dirs (preserve contents on upgrades)
   for (const sub of ["config", "data", "state", "cache", "plugins", "skills"]) {

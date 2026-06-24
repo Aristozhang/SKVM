@@ -369,12 +369,12 @@ export const junitGrade: CustomEvaluator = {
     )
 
     // Enforce the payload's timeout. Bun.spawn has no built-in timeout knob,
-    // so we race proc.exited against a sleep and SIGKILL on expiry.
+    // so we race proc.exited against a sleep and kill on expiry.
     let timedOut = false
     const timer = setTimeout(() => {
       timedOut = true
       try {
-        proc.kill("SIGKILL")
+        proc.kill()
       } catch {
         /* already exited */
       }

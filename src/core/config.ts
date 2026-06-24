@@ -23,8 +23,12 @@ function findFlag(name: string): string | undefined {
   return undefined
 }
 
+export function userHomeDir(): string {
+  return process.env.USERPROFILE ?? process.env.HOME ?? ""
+}
+
 export function expandHome(p: string): string {
-  if (p.startsWith("~/")) return path.join(process.env.HOME ?? "", p.slice(2))
+  if (p.startsWith("~/")) return path.join(userHomeDir(), p.slice(2))
   return p
 }
 

@@ -11,7 +11,8 @@ const QUARTERS = ["Q1", "Q2", "Q3", "Q4"]
  * Python fragment shared by all levels: verify solution.py exists and run it,
  * early-exiting with a failed checkpoint on either problem.
  */
-const PY_RUN_SOLUTION = pyRunSolution("solution.py", ["python3", "solution.py"])
+const PY_RUN_SOLUTION = pyRunSolution("solution.py",
+  process.platform === "win32" ? ["python", "solution.py"] : ["python3", "solution.py"])
 
 /**
  * L1: Basic syntax, file I/O

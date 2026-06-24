@@ -3,7 +3,7 @@ import { mkdir, rm, copyFile, readdir } from "node:fs/promises"
 import type { AgentAdapter, AdapterConfig, AdapterConfigMode, RunResult, SkillBundle, ProviderRoute } from "../core/types.ts"
 import { RunRecordBuilder, type ToolCallSpec } from "../core/run-record.ts"
 import { createLogger } from "../core/logger.ts"
-import { getAdapterRepoDir, getAdapterSettings, getProvidersConfig } from "../core/config.ts"
+import { getAdapterRepoDir, getAdapterSettings, getProvidersConfig, userHomeDir } from "../core/config.ts"
 import { HEADLESS_AGENT_DEFAULTS, TASK_FILE_DEFAULTS } from "../core/ui-defaults.ts"
 import {
   createSandbox,
@@ -20,7 +20,7 @@ import { runSubprocess } from "../core/subprocess.ts"
 const log = createLogger("openclaw")
 
 const BOOTSTRAP_FILES = ["SOUL.md", "BOOTSTRAP.md", "USER.md", "IDENTITY.md", "HEARTBEAT.md", "TOOLS.md"]
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 const USER_OPENCLAW_DIR = path.join(HOME, ".openclaw")
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,8 @@ async function resolveOpenClawCmd(): Promise<string[]> {
     )
   }
 
-  const { exitCode, stdout } = await runSubprocess(["which", "openclaw"])
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+  const { exitCode, stdout } = await runSubprocess([whichCmd, "openclaw"])
   if (exitCode === 0 && stdout.trim()) {
     log.info(`Using global openclaw: ${stdout.trim()}`)
     return [stdout.trim()]

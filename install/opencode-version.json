@@ -6,7 +6,8 @@
     "darwin-arm64": { "name": "opencode-darwin-arm64.zip", "format": "zip" },
     "darwin-x64": { "name": "opencode-darwin-x64.zip", "format": "zip" },
     "linux-x64": { "name": "opencode-linux-x64.tar.gz", "format": "tar.gz" },
-    "linux-arm64": { "name": "opencode-linux-arm64.tar.gz", "format": "tar.gz" }
+    "linux-arm64": { "name": "opencode-linux-arm64.tar.gz", "format": "tar.gz" },
+    "windows-x64": { "name": "opencode-windows-x64.zip", "format": "zip" }
   },
   "sha256": {
     "darwin-arm64": "d085c072087fa1cf076058ae28785a31a9368e0f3c42985ea8c558036fcb9b0c",

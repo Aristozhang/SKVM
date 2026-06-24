@@ -5,7 +5,7 @@ import type { AgentAdapter, AdapterConfig, AdapterConfigMode, RunResult, TokenUs
 import { RunRecordBuilder } from "../core/run-record.ts"
 import { runSubprocess } from "../core/subprocess.ts"
 import { createLogger } from "../core/logger.ts"
-import { getAdapterRepoDir, getAdapterSettings, getHeadlessAgentConfig, expandHome } from "../core/config.ts"
+import { getAdapterRepoDir, getAdapterSettings, getHeadlessAgentConfig, expandHome, userHomeDir } from "../core/config.ts"
 import { envForRoute, resolveBackendModel, resolveRoute, validateModelIdForRoute } from "../providers/registry.ts"
 import { diagnoseOpencode } from "./diagnose-failure.ts"
 import { subprocessVerdict } from "./subprocess-verdict.ts"
@@ -189,7 +189,8 @@ const INSTALL_HELP = "See https://skillvm.ai/install for setup."
 const tierBundled: Tier = async () => {
   const installRoot = getSkvmInstallRoot()
   if (!installRoot) return null
-  const bundled = path.join(installRoot, "vendor", "opencode", "current", "bin", "opencode")
+  const exeName = process.platform === "win32" ? "opencode.exe" : "opencode"
+  const bundled = path.join(installRoot, "vendor", "opencode", "current", "bin", exeName)
   if (!(await Bun.file(bundled).exists())) return null
   const profileRoot = path.join(installRoot, "vendor", "opencode", "profile")
   const env: Record<string, string> = {
@@ -254,7 +255,8 @@ const tierHeadlessExplicit: Tier = async () => {
 }
 
 const tierGlobal: Tier = async () => {
-  const { exitCode, stdout } = await runSubprocess(["which", "opencode"])
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+  const { exitCode, stdout } = await runSubprocess([whichCmd, "opencode"])
   if (exitCode !== 0 || !stdout.trim()) return null
   const p = stdout.trim()
   return { resolution: { cmd: [p], env: {} }, logLine: `Using global opencode: ${p}` }
@@ -292,8 +294,12 @@ export async function resolveHeadlessOpenCodeCmd(): Promise<OpenCodeResolution> 
   // Cache: jit-optimize / jit-boost call this once per task in hot loops,
   // and the config is process-lifetime constant.
   if (!_headlessCache) {
+    // On Windows prefer global opencode over bundled (user typically has it on PATH)
+    const tiers: Tier[] = process.platform === "win32"
+      ? [tierHeadlessExplicit, tierGlobal, tierBundled]
+      : [tierHeadlessExplicit, tierBundled, tierGlobal]
     _headlessCache = resolveTiers(
-      [tierHeadlessExplicit, tierBundled, tierGlobal],
+      tiers,
       "opencode not found for headless agent. Tried: headlessAgent.opencodePath, skvm-bundled copy (reinstall skvm via install.sh or npm), and global `which opencode`.",
     ).catch((err) => {
       _headlessCache = undefined
@@ -303,7 +309,7 @@ export async function resolveHeadlessOpenCodeCmd(): Promise<OpenCodeResolution> 
   return _headlessCache
 }
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 
 // Per opencode `packages/opencode/src/config/config.ts:1106,1255,1348`:
 // global user config honors three filenames; explicit-dir and legacy home

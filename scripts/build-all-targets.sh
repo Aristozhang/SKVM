@@ -27,6 +27,7 @@ targets=(
   "darwin-x64"
   "linux-x64"
   "linux-arm64"
+  "windows-x64"
 )
 
 # Allow BUILD_TARGETS=darwin-arm64,linux-x64 to override (useful for fast local smoke tests).

@@ -6,6 +6,7 @@ import type { BoostCandidate, ParamDef, SolidificationEntry, SolidificationState
 import { normalizeParamDef } from "./types.ts"
 import { extractStructured } from "../providers/structured.ts"
 import { createLogger } from "../core/logger.ts"
+import { resolveShellPrefix, resolveRealExe } from "../core/agent-tools.ts"
 
 const log = createLogger("solidifier")
 
@@ -410,7 +411,12 @@ async function executeTemplate(
     let proc: ReturnType<typeof Bun.spawn>
 
     if (type === "shell") {
-      proc = Bun.spawn(["sh", "-c", code], {
+      const argv0Match = code.match(/^(\S+)/)
+      const argv0 = argv0Match?.[1]
+      const resolvedCode = argv0 && resolveRealExe(argv0) !== argv0
+        ? resolveRealExe(argv0) + code.slice(argv0.length)
+        : code
+      proc = Bun.spawn([...resolveShellPrefix(), resolvedCode], {
         cwd: workDir,
         stdout: "pipe",
         stderr: "pipe",

@@ -8,6 +8,7 @@ import { extractStructured } from "../providers/structured.ts"
 import { isProviderError } from "../providers/errors.ts"
 import { isHeadlessAgentError } from "../core/headless-agent/index.ts"
 import { createLogger } from "../core/logger.ts"
+import { resolveShellPrefix, resolveRealExe, rewriteHeredoc } from "../core/agent-tools.ts"
 
 const log = createLogger("evaluator")
 
@@ -136,8 +137,19 @@ async function evaluateScript(
   runResult: RunResult,
 ): Promise<EvalResult> {
   try {
-    const command = fixInlinePython(criterion.command)
-    const proc = Bun.spawn(["sh", "-c", command], {
+    let command = fixInlinePython(criterion.command)
+    // On Windows, rewrite bash heredocs to temp-file form
+    const shellPrefix = resolveShellPrefix()
+    if (process.platform === "win32" && shellPrefix[0] === "powershell" && command.includes("<<")) {
+      command = rewriteHeredoc(command, runResult.workDir)
+    }
+    // On Windows, replace fake WindowsApps stubs with real executables
+    const argv0Match = command.match(/^(\S+)/)
+    const argv0 = argv0Match?.[1]
+    const resolvedCmd = argv0 && resolveRealExe(argv0) !== argv0
+      ? resolveRealExe(argv0) + command.slice(argv0.length)
+      : command
+    const proc = Bun.spawn([...shellPrefix, resolvedCmd], {
       cwd: runResult.workDir,
       stdout: "pipe",
       stderr: "pipe",

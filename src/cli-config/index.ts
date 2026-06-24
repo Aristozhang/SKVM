@@ -1039,7 +1039,8 @@ async function configureAdapter(a: ConfigurableAdapter, cur: AdapterDraft): Prom
 
 function whichBinary(name: string): string | null {
   try {
-    const r = spawnSync("which", [name], { encoding: "utf8" })
+    const cmd = process.platform === "win32" ? "where" : "which"
+    const r = spawnSync(cmd, [name], { encoding: "utf8" })
     if (r.status === 0 && r.stdout) {
       const out = r.stdout.trim()
       return out || null

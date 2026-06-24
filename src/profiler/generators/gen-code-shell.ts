@@ -1,5 +1,6 @@
 import type { MicrobenchmarkInstance } from "../types.ts"
 import { defineGenerator, pyEval, type Rng } from "../generator-toolkit.ts"
+import { resolveShellPrefix } from "../../core/agent-tools.ts"
 
 const PREFIXES = ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"]
 const LOG_LEVELS = ["ERROR", "WARN", "INFO", "DEBUG"]
@@ -8,9 +9,11 @@ const NAMES = ["Alice", "Bob", "Carol", "Dave", "Eve", "Frank", "Grace", "Hank"]
 
 /**
  * Shell prefix shared by all levels: run the candidate script before the
- * checkpoint script inspects result.txt.
+ * checkpoint script inspects result.txt. On Windows, requires native Git Bash
+ * (not WSL) — if unavailable, prefix is empty and shell tasks won't execute.
  */
-const RUN_SOLUTION_PREFIX = "bash solution.sh >/dev/null 2>&1"
+const _hasBash = resolveShellPrefix()[0] !== "powershell"
+const RUN_SOLUTION_PREFIX = _hasBash ? "bash solution.sh >/dev/null 2>&1" : ""
 
 /**
  * L1: Using grep, count lines in data.txt starting with PREFIX,

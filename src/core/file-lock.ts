@@ -197,8 +197,10 @@ function installHandlers(): void {
     }
   }
   process.on("SIGINT", signalHandler("SIGINT", 130))
-  process.on("SIGTERM", signalHandler("SIGTERM", 143))
-  process.on("SIGHUP", signalHandler("SIGHUP", 129))
+  if (process.platform !== "win32") {
+    process.on("SIGTERM", signalHandler("SIGTERM", 143))
+    process.on("SIGHUP", signalHandler("SIGHUP", 129))
+  }
 }
 
 function readLockPayload(file: string): LockPayload | null {

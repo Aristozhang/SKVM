@@ -4,12 +4,12 @@
  * and directories are in play.
  */
 
-import { getProvidersConfig, getAdapterRepoDir } from "./config.ts"
+import { getProvidersConfig, getAdapterRepoDir, userHomeDir } from "./config.ts"
 import { findMatchingRoute } from "../providers/registry.ts"
 import { c } from "./logger.ts"
 import pkgJson from "../../package.json" with { type: "json" }
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 
 /** Replace $HOME prefix with `~` for display. */
 export function shortenPath(p: string): string {

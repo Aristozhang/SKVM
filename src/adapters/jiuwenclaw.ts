@@ -6,7 +6,7 @@ import type { AgentAdapter, AdapterConfig, RunResult, SkillBundle } from "../cor
 import { RunRecordBuilder, minimalRecord } from "../core/run-record.ts"
 import { subprocessVerdict } from "./subprocess-verdict.ts"
 import { createLogger } from "../core/logger.ts"
-import { getAdapterRepoDir } from "../core/config.ts"
+import { getAdapterRepoDir, userHomeDir } from "../core/config.ts"
 import { acquireFileLock, releaseFileLock } from "../core/file-lock.ts"
 import { runSubprocess } from "../core/subprocess.ts"
 import { TASK_FILE_DEFAULTS } from "../core/ui-defaults.ts"
@@ -30,7 +30,7 @@ const log = createLogger("jiuwenclaw")
 // at most one sidecar may live at a time across all processes on the host. We
 // enforce that with a cross-process file lock (reused from openclaw's pattern).
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 const JIUWEN_DIR = path.join(HOME, ".jiuwenclaw")
 const JIUWEN_ENV_PATH = path.join(JIUWEN_DIR, "config", ".env")
 const JIUWEN_ENV_BACKUP = path.join(JIUWEN_DIR, "config", ".env.skvm-backup")
@@ -170,7 +170,8 @@ export async function resolveJiuwenClawCmd(): Promise<string[]> {
   }
 
   // 2. Global install
-  const { exitCode, stdout } = await runSubprocess(["which", "jiuwenclaw-cli"])
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+  const { exitCode, stdout } = await runSubprocess([whichCmd, "jiuwenclaw-cli"])
   if (exitCode === 0 && stdout.trim()) {
     log.info(`Using global jiuwenclaw-cli: ${stdout.trim()}`)
     return [stdout.trim()]
@@ -644,16 +645,17 @@ export class JiuwenClawAdapter implements AgentAdapter {
     this.sidecar = undefined
 
     if (proc && proc.exitCode === null) {
+      const isWin = process.platform === "win32"
       try {
-        proc.kill("SIGTERM")
+        proc.kill(isWin ? undefined : "SIGTERM")
       } catch { /* ignore */ }
 
       const timer = Bun.sleep(SIDECAR_SHUTDOWN_TIMEOUT_MS).then(() => "timeout" as const)
       const exited = proc.exited.then(() => "exited" as const)
       const outcome = await Promise.race([timer, exited])
       if (outcome === "timeout") {
-        log.warn("jiuwenclaw sidecar did not exit within 15s; sending SIGKILL")
-        try { proc.kill("SIGKILL") } catch { /* ignore */ }
+        log.warn("jiuwenclaw sidecar did not exit within 15s; force-killing")
+        try { proc.kill() } catch { /* ignore */ }
         try { await proc.exited } catch { /* ignore */ }
       }
     }
@@ -663,11 +665,13 @@ export class JiuwenClawAdapter implements AgentAdapter {
     // on KeyboardInterrupt — not on SIGTERM. So killing the orchestrator
     // reliably leaves its two children orphaned. We own the sidecar lock, so
     // sweep any remaining jiuwenclaw.app* processes and wait for the port to
-    // clear.
-    try {
-      const killProc = Bun.spawn(["pkill", "-f", "jiuwenclaw\\.app"], { stdout: "pipe", stderr: "pipe" })
-      await killProc.exited
-    } catch { /* ignore */ }
+    // clear. (pkill is only available on Linux/macOS — skip on Windows.)
+    if (process.platform !== "win32") {
+      try {
+        const killProc = Bun.spawn(["pkill", "-f", "jiuwenclaw\\.app"], { stdout: "pipe", stderr: "pipe" })
+        await killProc.exited
+      } catch { /* ignore */ }
+    }
 
     const deadline = Date.now() + 5000
     while (Date.now() < deadline) {
@@ -814,7 +818,7 @@ function installProcessExitHook(): void {
         // module).
         const proc = (a as unknown as { sidecar?: { kill: (sig?: number | string) => void } }).sidecar
         if (proc) {
-          try { proc.kill("SIGKILL") } catch { /* ignore */ }
+          try { proc.kill() } catch { /* ignore */ }
         }
         const envBackedUp = (a as unknown as { envBackedUp: boolean }).envBackedUp
         if (envBackedUp && existsSync(JIUWEN_ENV_BACKUP)) {
@@ -832,8 +836,10 @@ function installProcessExitHook(): void {
     process.kill(process.pid, sig)
   }
   process.once("SIGINT", signalExit)
-  process.once("SIGTERM", signalExit)
-  process.once("SIGHUP", signalExit)
+  if (process.platform !== "win32") {
+    process.once("SIGTERM", signalExit)
+    process.once("SIGHUP", signalExit)
+  }
 }
 
 // ---------------------------------------------------------------------------

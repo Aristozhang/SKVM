@@ -125,7 +125,10 @@ function installExitHook(): void {
   }
   process.once("exit", cleanup)
   // Re-raise signals so the default disposition still runs.
-  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+  const sigs: NodeJS.Signals[] = process.platform === "win32"
+    ? ["SIGINT", "SIGBREAK"]
+    : ["SIGINT", "SIGTERM", "SIGHUP"]
+  for (const sig of sigs) {
     process.once(sig, () => {
       cleanup()
       process.kill(process.pid, sig)

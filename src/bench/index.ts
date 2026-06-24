@@ -11,7 +11,7 @@ import {
   printCompareBenchSkillReport,
   writeCompareBenchSkillOutputs,
 } from "./compare.ts"
-import { LOGS_DIR, getBenchLogDir, SKVM_CACHE, resolveAdapterConfigMode } from "../core/config.ts"
+import { LOGS_DIR, getBenchLogDir, SKVM_CACHE, resolveAdapterConfigMode, userHomeDir } from "../core/config.ts"
 import { mkdir, readdir } from "node:fs/promises"
 import { runDeferredJudge, readDeferredResults, mergeDeferredResults } from "../framework/deferred-eval.ts"
 import { ALL_ADAPTERS, type AdapterName, isAdapterName } from "../adapters/registry.ts"
@@ -19,7 +19,7 @@ import { CLI_DEFAULTS, MODEL_DEFAULTS } from "../core/ui-defaults.ts"
 import { TIMEOUT_DEFAULTS } from "../core/timeouts.ts"
 import { assertKnownFlags, parseSkillModeFlag } from "../core/cli-flags.ts"
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 
 const BENCH_KNOWN_FLAGS: ReadonlySet<string> = new Set([
   // Mode selectors

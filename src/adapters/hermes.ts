@@ -5,7 +5,7 @@ import type { AgentAdapter, AdapterConfig, AdapterConfigMode, RunResult, SkillBu
 import { RunRecordBuilder, minimalRecord } from "../core/run-record.ts"
 import { subprocessVerdict } from "./subprocess-verdict.ts"
 import { createLogger } from "../core/logger.ts"
-import { getAdapterRepoDir, getAdapterSettings } from "../core/config.ts"
+import { getAdapterRepoDir, getAdapterSettings, userHomeDir } from "../core/config.ts"
 import { envForRoute, resolveBackendModel, resolveRoute, resolveRouteApiKey, validateModelIdForRoute } from "../providers/registry.ts"
 import { diagnoseHermes } from "./diagnose-failure.ts"
 import { runSubprocess } from "../core/subprocess.ts"
@@ -144,7 +144,8 @@ export async function resolveHermesCmd(): Promise<string[]> {
   }
 
   // 2. Global install
-  const { exitCode, stdout } = await runSubprocess(["which", "hermes"])
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+  const { exitCode, stdout } = await runSubprocess([whichCmd, "hermes"])
   if (exitCode === 0 && stdout.trim()) {
     log.info(`Using global hermes: ${stdout.trim()}`)
     return [stdout.trim()]
@@ -183,7 +184,7 @@ async function resolvePython(): Promise<string> {
 // Hermes Adapter
 // ---------------------------------------------------------------------------
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 const HERMES_ROOT = path.join(HOME, ".hermes")
 
 /**

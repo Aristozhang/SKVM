@@ -143,7 +143,7 @@ export function pyEval(spec: PyEvalSpec): EvalCriterion {
   ]
   return {
     method: "script",
-    command: `${spec.shellPrefix ? `${spec.shellPrefix}; ` : ""}python3 << 'PYEOF'\n${lines.join("\n")}\nPYEOF`,
+    command: `${spec.shellPrefix ? `${spec.shellPrefix}; ` : ""}${process.platform === "win32" ? "python" : "python3"} << 'PYEOF'\n${lines.join("\n")}\nPYEOF`,
     expectedExitCode: 0,
   }
 }

@@ -1060,7 +1060,7 @@ Proposals root: $SKVM_PROPOSALS_DIR or ~/.skvm/proposals by default.`)
         resolve()
       }
       process.on("SIGINT", shutdown)
-      process.on("SIGTERM", shutdown)
+      if (process.platform !== "win32") process.on("SIGTERM", shutdown)
     })
     return
   }
@@ -1117,11 +1117,14 @@ Proposals root: $SKVM_PROPOSALS_DIR or ~/.skvm/proposals by default.`)
       return
     }
 
-    // SIGTERM so file-lock.ts's signal handler runs `releaseAllHeld` and
-    // unlinks the optimize lock before exit. If the worker is stuck in a
-    // blocking call that ignores SIGTERM, escalate to SIGKILL after 2s.
+    // On Linux/macOS: SIGTERM so file-lock.ts's signal handler runs
+    // `releaseAllHeld` before exit. On Windows: process.kill(pid) without a
+    // signal string sends the equivalent of SIGTERM. If the worker is stuck,
+    // escalate to SIGKILL (Linux/macOS) or taskkill /F (Windows) after 2s.
+    const isWin = process.platform === "win32"
     try {
-      process.kill(pid, "SIGTERM")
+      if (isWin) process.kill(pid)
+      else process.kill(pid, "SIGTERM")
     } catch (err) {
       console.error(`cancel: failed to signal pid ${pid}: ${err}`)
       process.exit(1)
@@ -1135,7 +1138,10 @@ Proposals root: $SKVM_PROPOSALS_DIR or ~/.skvm/proposals by default.`)
     while (Date.now() - start < DEADLINE_MS) {
       if (!isPidAlive(pid)) { died = true; break }
       if (!escalated && Date.now() - start >= KILL_ESCALATE_MS) {
-        try { process.kill(pid, "SIGKILL") } catch { /* race — already dead */ }
+        try {
+          if (isWin) process.kill(pid)
+          else process.kill(pid, "SIGKILL")
+        } catch { /* race — already dead */ }
         escalated = true
       }
       await Bun.sleep(100)

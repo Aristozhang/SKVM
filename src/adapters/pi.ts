@@ -8,7 +8,7 @@ import type {
   SkillBundle,
 } from "../core/types.ts"
 import { createLogger } from "../core/logger.ts"
-import { getAdapterRepoDir, getAdapterSettings } from "../core/config.ts"
+import { getAdapterRepoDir, getAdapterSettings, userHomeDir } from "../core/config.ts"
 import { envForRoute, resolveRoute, validateModelIdForRoute } from "../providers/registry.ts"
 import { runSubprocess } from "../core/subprocess.ts"
 import { subprocessVerdict } from "./subprocess-verdict.ts"
@@ -29,7 +29,7 @@ import {
 
 const log = createLogger("pi")
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 /** User-side pi config dir (`~/.pi/agent/`). Mirrored into sandbox in native mode. */
 const PI_USER_AGENT_DIR = path.join(HOME, ".pi", "agent")
 
@@ -85,7 +85,8 @@ const tierAdapterRepo: Tier = async () => {
 }
 
 const tierGlobal: Tier = async () => {
-  const { exitCode, stdout } = await runSubprocess(["which", "pi"])
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+  const { exitCode, stdout } = await runSubprocess([whichCmd, "pi"])
   if (exitCode !== 0 || !stdout.trim()) return null
   const p = stdout.trim()
   return { cmd: [p], logLine: `Using global pi: ${p}` }

@@ -4,7 +4,7 @@ import type { AgentAdapter, AdapterConfig, AdapterConfigMode, ProviderRoute, Run
 import { emptyTokenUsage } from "../core/types.ts"
 import { RunRecordBuilder, type ToolCallSpec } from "../core/run-record.ts"
 import { createLogger } from "../core/logger.ts"
-import { getAdapterRepoDir, getAdapterSettings, getHeadlessAgentConfig, expandHome } from "../core/config.ts"
+import { getAdapterRepoDir, getAdapterSettings, getHeadlessAgentConfig, expandHome, userHomeDir } from "../core/config.ts"
 import { envForRoute, resolveBackendModel, resolveRoute, validateModelIdForRoute } from "../providers/registry.ts"
 import { diagnoseClaudeCode } from "./diagnose-failure.ts"
 import { subprocessVerdict } from "./subprocess-verdict.ts"
@@ -310,7 +310,8 @@ const tierHeadlessExplicit: Tier = async () => {
 }
 
 const tierGlobal: Tier = async () => {
-  const { exitCode, stdout } = await runSubprocess(["which", "claude"])
+  const whichCmd = process.platform === "win32" ? "where" : "which"
+  const { exitCode, stdout } = await runSubprocess([whichCmd, "claude"])
   if (exitCode !== 0 || !stdout.trim()) return null
   const p = stdout.trim()
   return { resolution: { cmd: [p], env: {} }, logLine: `Using global claude: ${p}` }
@@ -352,7 +353,7 @@ export async function resolveHeadlessClaudeCmd(): Promise<ClaudeCodeResolution> 
 // User-config discovery (native mode)
 // ---------------------------------------------------------------------------
 
-const HOME = process.env.HOME ?? ""
+const HOME = userHomeDir()
 
 export function resolveUserClaudeDir(): string {
   const explicit = process.env.CLAUDE_CONFIG_DIR?.trim()
