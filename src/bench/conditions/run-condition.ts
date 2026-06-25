@@ -6,6 +6,7 @@ import { emptyTokenUsage } from "../../core/types.ts"
 import type { EvaluatorConfig, EvaluateAllOptions } from "../../framework/evaluator.ts"
 import { runTask } from "../../framework/runner.ts"
 import { getTmpDir } from "../../core/config.ts"
+import { resolveShellPrefix } from "../../core/agent-tools.ts"
 import type { BenchTask, BenchCondition, ConditionResult } from "../types.ts"
 import type { ConversationLog } from "../../core/conversation-logger.ts"
 import { createLogger } from "../../core/logger.ts"
@@ -39,12 +40,15 @@ export async function prepareWorkDir(task: BenchTask): Promise<string> {
       const f = Bun.file(setupScript)
       if (await f.exists()) {
         log.debug(`Running _setup.sh for task ${task.id}`)
-        const proc = Bun.spawn(["bash", "_setup.sh"], {
-          cwd: workDir,
-          stdout: "pipe",
-          stderr: "pipe",
-        })
-        await proc.exited
+        const shellPrefix = resolveShellPrefix()
+        if (shellPrefix[0] !== "powershell") {
+          const proc = Bun.spawn([shellPrefix[0]!, "_setup.sh"], {
+            cwd: workDir,
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          await proc.exited
+        }
       }
     } catch { /* no setup script or execution failed */ }
   }

@@ -1,4 +1,5 @@
 import { createLogger } from "../../../core/logger.ts"
+import { resolveShellPrefix } from "../../../core/agent-tools.ts"
 
 const log = createLogger("pass2:platform")
 
@@ -24,8 +25,17 @@ export interface PlatformContext {
 }
 
 async function commandExists(command: string): Promise<boolean> {
+  if (process.platform === "win32") {
+    // On Windows, use `where` instead of `bash -lc`
+    try {
+      const proc = Bun.spawn(["where", command], { stdout: "pipe", stderr: "pipe" })
+      const code = await proc.exited
+      return code === 0
+    } catch { return false }
+  }
+  const shellPrefix = resolveShellPrefix()
   try {
-    const proc = Bun.spawn(["bash", "-lc", `command -v ${command} >/dev/null 2>&1`], {
+    const proc = Bun.spawn([shellPrefix[0]!, "-lc", `command -v ${command} >/dev/null 2>&1`], {
       stdout: "pipe",
       stderr: "pipe",
     })

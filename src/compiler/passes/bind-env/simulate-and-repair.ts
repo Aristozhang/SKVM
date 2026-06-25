@@ -4,6 +4,7 @@ import { createLogger } from "../../../core/logger.ts"
 import type { LLMProvider } from "../../../providers/types.ts"
 import type { DependencyEntry } from "../../../core/types.ts"
 import type { PlatformContext } from "./platform.ts"
+import { resolveShellPrefix } from "../../../core/agent-tools.ts"
 
 const log = createLogger("pass2:simulate")
 
@@ -34,11 +35,17 @@ export interface ScriptSimulationResult {
 }
 
 async function runScriptOnce(script: string, workDir: string, attempt: number): Promise<{ success: boolean; output: string }> {
+  const shellPrefix = resolveShellPrefix()
+  // On Windows without native bash, skip script execution (scripts are #!/bin/bash)
+  if (shellPrefix[0] === "powershell") {
+    return { success: false, output: "bash not available: install Git for Windows or WSL" }
+  }
+  const bashPath = shellPrefix[0]!
   const scriptPath = path.join(workDir, `.skvm-env-setup-attempt-${attempt}.sh`)
   await Bun.write(scriptPath, script)
 
   try {
-    const proc = Bun.spawn(["bash", scriptPath], {
+    const proc = Bun.spawn([bashPath, scriptPath], {
       cwd: workDir,
       stdout: "pipe",
       stderr: "pipe",
