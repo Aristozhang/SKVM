@@ -166,7 +166,7 @@ function getSkvmInstallRoot(): string | null {
 
   const execPath = process.execPath
   if (execPath.startsWith("/$bunfs")) return null
-  if (path.basename(execPath) === "skvm") {
+  if (path.basename(execPath).startsWith("skvm")) {
     return path.dirname(path.dirname(execPath))
   }
   return null

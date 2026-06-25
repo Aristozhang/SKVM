@@ -56,6 +56,10 @@ for target in "${targets[@]}"; do
   cp -R skills/skvm-general "${stage}/skills/"
   cp README.md "${stage}/README.md"
   cp LICENSE "${stage}/LICENSE"
+  # Bun compiled binaries need package.json at runtime (version metadata).
+  # Copy to both the tarball root and bin/ â€?Bun resolves from the binary's dir.
+  cp package.json "${stage}/package.json"
+  cp package.json "${stage}/bin/package.json"
 
   # Tarball layout: bin/skvm, skills/, README.md, LICENSE at top level
   # (no wrapper dir), so `tar -xzf ... -C $PREFIX` lays out directly under $PREFIX.
