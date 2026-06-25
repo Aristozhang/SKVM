@@ -7,7 +7,7 @@
 import { getProvidersConfig, getAdapterRepoDir, userHomeDir } from "./config.ts"
 import { findMatchingRoute } from "../providers/registry.ts"
 import { c } from "./logger.ts"
-import pkgJson from "../../package.json" with { type: "json" }
+import { SKVM_VERSION } from "./version.ts"
 
 const HOME = userHomeDir()
 
@@ -50,7 +50,7 @@ export function describeAdapter(name: string): string {
  * ```
  */
 export function printBanner(command: string, lines: [string, string][]): void {
-  console.log(`\nskvm ${command} v${pkgJson.version}`)
+  console.log(`\nskvm ${command} v${SKVM_VERSION}`)
   const maxLabel = Math.max(...lines.map(([l]) => l.length))
   for (const [label, value] of lines) {
     console.log(`  ${label.padEnd(maxLabel)}  ${value}`)

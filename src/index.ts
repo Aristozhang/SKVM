@@ -9,7 +9,7 @@ import { assertKnownFlags, parseSkillModeFlag } from "./core/cli-flags.ts"
 import { runOrExit } from "./cli/flags.ts"
 import { CLI_DEFAULTS, MODEL_DEFAULTS } from "./core/ui-defaults.ts"
 import { TIMEOUT_DEFAULTS } from "./core/timeouts.ts"
-import pkgJson from "../package.json" with { type: "json" }
+import { SKVM_VERSION } from "./core/version.ts"
 
 const args = process.argv.slice(2)
 // Strip --no-auto-probe before any subcommand or flag parsing so it works
@@ -60,7 +60,7 @@ async function main() {
   if (flags.verbose) setLogLevel("debug")
 
   if (isTopLevelVersion) {
-    console.log(pkgJson.version)
+    console.log(SKVM_VERSION)
     process.exit(0)
   }
 
