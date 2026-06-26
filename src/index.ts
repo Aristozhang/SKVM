@@ -1645,9 +1645,10 @@ function stripSuffix(kind: import("./jit-optimize/types.ts").TaskSource["kind"])
 }
 
 function deriveSkillName(skillDir: string): string {
-  const base = skillDir.split("/").filter(Boolean).pop() ?? ""
+  const parts = skillDir.replace(/\\/g, "/").split("/").filter(Boolean)
+  const base = parts.pop() ?? ""
   if (/^v\d/.test(base)) {
-    const parent = skillDir.split("/").filter(Boolean).slice(-2, -1)[0] ?? ""
+    const parent = parts.pop() ?? ""
     return parent
   }
   return base
