@@ -2029,8 +2029,17 @@ export function pickBestRound(
 // ---------------------------------------------------------------------------
 
 function resolveSkillName(skillDir: string): string {
-  const dirName = path.basename(skillDir)
-  return /^v\d/.test(dirName) ? path.basename(path.dirname(skillDir)) : dirName
+  // Normalize separators and extract the last non-empty component.
+  // On Windows compiled binaries, path.basename can be unreliable with
+  // mixed separators, so we use a manual fallback.
+  const normalized = skillDir.replace(/\\/g, "/").replace(/\/+$/, "")
+  const parts = normalized.split("/")
+  const dirName = parts[parts.length - 1] ?? "skill"
+  if (/^v\d/.test(dirName)) {
+    const parent = parts[parts.length - 2]
+    if (parent) return parent
+  }
+  return dirName
 }
 
 function describeSource(source: TaskSource): string {
