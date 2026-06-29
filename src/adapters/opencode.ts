@@ -465,6 +465,24 @@ export class OpenCodeAdapter implements AgentAdapter {
     this.envOverlay = envOverlay
     log.info(`opencode command: ${this.cmdPrefix.join(" ")}`)
     log.info(`opencode model: ${this.model} (mode=${this.mode}, sandbox=${root})`)
+
+    // Warm up: run opencode once in the sandbox so it completes one-time
+    // database migration. Without this, every headless `opencode run` call
+    // triggers the migration and exits, which SkVM interprets as a crash.
+    await this.warmup()
+  }
+
+  /** Run opencode --version in the sandbox to trigger DB migration, then wait for it to exit. */
+  private async warmup(): Promise<void> {
+    try {
+      await runSubprocess([...this.cmdPrefix, "--version"], {
+        env: this.envOverlay,
+        timeoutMs: 30000,
+      })
+      log.debug("opencode warmup complete")
+    } catch {
+      log.debug("opencode warmup failed (non-fatal)")
+    }
   }
 
   async run(task: {
