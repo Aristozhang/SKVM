@@ -11,4 +11,4 @@
  * a release.  The CI release workflow patches package.json from the git tag,
  * so add a matching sed / node one-liner there if you automate it.
  */
-export const SKVM_VERSION = "0.1.10"
+export const SKVM_VERSION = "0.1.16"

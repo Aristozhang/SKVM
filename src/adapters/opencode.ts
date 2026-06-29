@@ -406,9 +406,12 @@ export class OpenCodeAdapter implements AgentAdapter {
     const resolved = await resolveAdapterOpenCodeCmd()
     this.cmdPrefix = resolved.cmd
 
-    // Build the sandbox HOME (XDG_* pointing into it) so runs don't touch
-    // the user's global opencode state.
-    this.sandbox = createSandbox("opencode")
+    // Build the sandbox HOME once per adapter lifetime. Subsequent setup()
+    // calls (e.g. between runs in a jit-optimize round) reuse the same
+    // sandbox so opencode's one-time database migration doesn't re-fire.
+    if (!this.sandbox) {
+      this.sandbox = createSandbox("opencode")
+    }
     const root = this.sandbox.root
     const cfgDir = path.join(root, "config", "opencode")
     const dataDir = path.join(root, "data", "opencode")
