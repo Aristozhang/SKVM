@@ -465,24 +465,6 @@ export class OpenCodeAdapter implements AgentAdapter {
     this.envOverlay = envOverlay
     log.info(`opencode command: ${this.cmdPrefix.join(" ")}`)
     log.info(`opencode model: ${this.model} (mode=${this.mode}, sandbox=${root})`)
-
-    // Warm up: run opencode once in the sandbox so it completes one-time
-    // database migration. Without this, every headless `opencode run` call
-    // triggers the migration and exits, which SkVM interprets as a crash.
-    await this.warmup()
-  }
-
-  /** Run opencode --version in the sandbox to trigger DB migration, then wait for it to exit. */
-  private async warmup(): Promise<void> {
-    try {
-      await runSubprocess([...this.cmdPrefix, "--version"], {
-        env: this.envOverlay,
-        timeoutMs: 30000,
-      })
-      log.debug("opencode warmup complete")
-    } catch {
-      log.debug("opencode warmup failed (non-fatal)")
-    }
   }
 
   async run(task: {
@@ -532,11 +514,21 @@ export class OpenCodeAdapter implements AgentAdapter {
       ...this.extraCliArgs,
     ]
 
-    const { stdout, stderr, exitCode, timedOut } = await runSubprocess(cmd, {
-      cwd: task.workDir,
-      timeoutMs: task.timeoutMs ?? this.timeoutMs,
-      env: this.envOverlay,
-    })
+    // opencode may need a one-time database migration on first run in a fresh
+    // sandbox. After migration it exits with code 1; retry once — the second
+    // invocation finds the migrated db and proceeds normally.
+    let { stdout, stderr, exitCode, timedOut } = { stdout: "", stderr: "", exitCode: -1, timedOut: false }
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      const result = await runSubprocess(cmd, {
+        cwd: task.workDir,
+        timeoutMs: task.timeoutMs ?? this.timeoutMs,
+        env: this.envOverlay,
+      })
+      stdout = result.stdout; stderr = result.stderr; exitCode = result.exitCode; timedOut = result.timedOut
+      if (exitCode === 0) break
+      if (!(exitCode === 1 && stderr && /\bdatabase.?migration\b/i.test(stderr))) break
+      log.debug("opencode migration detected on first run, retrying…")
+    }
 
     const durationMs = performance.now() - startMs
 
