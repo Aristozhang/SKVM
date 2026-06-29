@@ -10,6 +10,7 @@ import { envForRoute, resolveBackendModel, resolveRoute, validateModelIdForRoute
 import { diagnoseOpencode } from "./diagnose-failure.ts"
 import { subprocessVerdict } from "./subprocess-verdict.ts"
 import { TASK_FILE_DEFAULTS } from "../core/ui-defaults.ts"
+import { copyDirRecursive } from "../core/fs-utils.ts"
 import {
   createSandbox,
   ensureDir,
@@ -452,6 +453,12 @@ export class OpenCodeAdapter implements AgentAdapter {
       // auth.json is copied (not symlinked) so an OAuth refresh from the
       // sandbox doesn't overwrite the user's real credentials.
       copyFileIfExists(path.join(userOpencodeDataDir(), "auth.json"), path.join(dataDir, "auth.json"))
+      // Copy the user's opencode data directory (database, etc.) so the
+      // sandbox starts with a pre-migrated database — avoids re-migration
+      // on every invocation.
+      try {
+        await copyDirRecursive(userOpencodeDataDir(), dataDir)
+      } catch { /* non-fatal: opencode will auto-migrate on first run */ }
     } else {
       // Managed: empty sandbox. For openai-compatible routes, inject a
       // synthesized provider via OPENCODE_CONFIG_CONTENT so opencode doesn't
