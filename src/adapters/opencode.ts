@@ -610,8 +610,9 @@ export class OpenCodeAdapter implements AgentAdapter {
   }
 
   async teardown(): Promise<void> {
-    this.sandbox?.teardown()
-    this.sandbox = undefined
+    // Keep the sandbox alive across runs — destroying it between every run
+    // forces a fresh database migration on the next setup. Only destroy
+    // during final shutdown when the adapter is discarded.
   }
 }
 
